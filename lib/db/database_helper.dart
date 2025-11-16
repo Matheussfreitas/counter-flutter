@@ -29,10 +29,34 @@ class DatabaseHelper {
             value INTEGER
           )
         ''');
+        // ADICIONA TABELA DE LOGS
+        await db.execute('''
+          CREATE TABLE logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT,
+            message TEXT
+          )
+        ''');
       },
     );
   }
 
+  // --- LOGS ---
+  Future<void> insertLog(String message) async {
+    final db = await database;
+    await db.insert('logs', {
+      'timestamp': DateTime.now().toIso8601String(),
+      'message': message,
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> getAllLogs() async {
+    final db = await database;
+    // Ordenar por ID decrescente (mais recente primeiro)
+    return await db.query('logs', orderBy: 'id DESC');
+  }
+
+  // --- COUNTERS ---
   Future<int> insertCounter(CounterModel counter) async {
     final db = await database;
     return await db.insert('counters', counter.toMap());
@@ -40,7 +64,8 @@ class DatabaseHelper {
 
   Future<List<CounterModel>> getAllCounters() async {
     final db = await database;
-    final result = await db.query('counters');
+    // Ordenar por ID decrescente (mais recente primeiro)
+    final result = await db.query('counters', orderBy: 'id DESC');
     return result.map((e) => CounterModel.fromMap(e)).toList();
   }
 
