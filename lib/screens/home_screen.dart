@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import '../db/database_helper.dart';
+
 import '../models/counter_model.dart';
+import '../storage/memory_storage.dart';
 import './counter_detail_screen.dart'; // Importa nova tela
 import './log_screen.dart'; // Importa nova tela
 
@@ -12,7 +13,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final dbHelper = DatabaseHelper.instance;
+  final storage = MemoryStorage.instance;
   List<CounterModel> counters = [];
 
   @override
@@ -22,11 +23,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadCounters() async {
-    final list = await dbHelper.getAllCounters();
+    final list = await storage.getAllCounters();
     setState(() => counters = list);
   }
 
-Future<void> _addCounterDialog() async {
+  Future<void> _addCounterDialog() async {
     final controller = TextEditingController();
 
     await showDialog(
@@ -48,15 +49,20 @@ Future<void> _addCounterDialog() async {
           ElevatedButton(
             onPressed: () async {
               if (controller.text.isNotEmpty) {
-                final newCounter = CounterModel(name: controller.text, value: 0);
-                
-                // Espere as operações de DB terminarem
-                await dbHelper.insertCounter(newCounter);
-                await dbHelper.insertLog('Contador "${controller.text}" criado.');
+                final newCounter = CounterModel(
+                  name: controller.text,
+                  value: 0,
+                );
+
+                // Salva em memória
+                await storage.insertCounter(newCounter);
+                await storage.insertLog(
+                  'Contador "${controller.text}" criado.',
+                );
 
                 // 3. (IMPORTANTE) Verifique se o widget ainda está "montado" (na tela)
                 //    depois que as operações 'await' terminaram.
-                if (!mounted) return; 
+                if (!mounted) return;
 
                 // 4. Use 'dialogContext' para fechar com segurança
                 Navigator.pop(dialogContext);
@@ -72,15 +78,15 @@ Future<void> _addCounterDialog() async {
 
   // Deleta o contador (usado pelo Dismissible)
   Future<void> _deleteCounter(CounterModel counter) async {
-    await dbHelper.deleteCounter(counter.id!);
+    await storage.deleteCounter(counter.id!);
     // LOG
-    await dbHelper.insertLog('Contador "${counter.name}" deletado.');
-    
+    await storage.insertLog('Contador "${counter.name}" deletado.');
+
     // Mostra um feedback
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('"${counter.name}" deletado.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('"${counter.name}" deletado.')));
     }
     _loadCounters();
   }
@@ -122,7 +128,9 @@ Future<void> _addCounterDialog() async {
         ],
       ),
       body: counters.isEmpty
-          ? const Center(child: Text('Nenhum contador ainda. Crie um no botão +.'))
+          ? const Center(
+              child: Text('Nenhum contador ainda. Crie um no botão +.'),
+            )
           : ListView.builder(
               itemCount: counters.length,
               itemBuilder: (context, index) {
@@ -143,9 +151,8 @@ Future<void> _addCounterDialog() async {
                       // Mostra o valor grande no final
                       trailing: Text(
                         '${c.value}',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold
-                        ),
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       onTap: () => _navigateToDetail(c),
                     ),
